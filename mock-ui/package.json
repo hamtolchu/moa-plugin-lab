@@ -1,5 +1,5 @@
 {
-  "name": "mock-ui-plugin",
+  "name": "moa-plugin-lab",
   "version": "1.0.1",
   "description": "Mock UI generator plugin for Claude Code",
   "private": true,

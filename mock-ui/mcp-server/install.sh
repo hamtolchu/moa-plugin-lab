@@ -11,7 +11,7 @@ warn()  { echo -e "${YELLOW}!${NC} $1"; }
 error() { echo -e "${RED}✗${NC} $1"; exit 1; }
 
 INSTALL_DIR="$HOME/.mock-ui"
-REPO_URL="https://github.com/hamtolchu/mao-startkit.git"
+REPO_URL="https://github.com/hamtolchu/moa-plugin-lab.git"
 CONFIG_PATH="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
 BACKUP_PATH="${CONFIG_PATH}.bak"
 
