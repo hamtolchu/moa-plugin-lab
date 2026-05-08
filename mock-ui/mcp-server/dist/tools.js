@@ -35,8 +35,24 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerTools = registerTools;
 const zod_1 = require("zod");
+const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
+const RESOURCES_DIR = process.env.MOCK_UI_RESOURCES_DIR
+    || path.join(__dirname, "..", "..", "resources");
+const DESIGN_CACHE = path.join(os.homedir(), ".mock-ui", "DESIGN.md");
+async function getDesignMd() {
+    if (fs.existsSync(DESIGN_CACHE)) {
+        return fs.readFileSync(DESIGN_CACHE, "utf8");
+    }
+    const res = await fetch("https://raw.githubusercontent.com/hamtolchu/mao-startkit/main/DESIGN.md");
+    if (!res.ok)
+        throw new Error(`DESIGN.md fetch 실패: HTTP ${res.status}`);
+    const content = await res.text();
+    fs.mkdirSync(path.dirname(DESIGN_CACHE), { recursive: true });
+    fs.writeFileSync(DESIGN_CACHE, content, "utf8");
+    return content;
+}
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { scaffoldMock, writeAndBuildMock } = require("../../scripts/core");
 const { deployMock } = require("../../scripts/deploy");
@@ -53,10 +69,32 @@ const writeAndBuildSchema = {
     pageTsx: zod_1.z.string().min(1).describe("app/page.tsx 전체 내용 (TypeScript + React)"),
 };
 function registerTools(server) {
+    // ── Catalog tools (fallback for code mode where ReadMcpResourceTool can't reach Desktop-configured servers) ──
+    server.tool("mock_ui_get_components", "컴포넌트 카탈로그(COMPONENTS.md)를 반환합니다. " +
+        "mock_ui_scaffold 호출 전에 이 도구 또는 mock-ui://components 리소스로 컴포넌트 목록을 파악하세요.", {}, async () => {
+        const componentsPath = path.join(RESOURCES_DIR, "COMPONENTS.md");
+        if (!fs.existsSync(componentsPath)) {
+            return {
+                content: [{ type: "text", text: `COMPONENTS.md를 찾을 수 없습니다: ${componentsPath}` }],
+                isError: true,
+            };
+        }
+        return { content: [{ type: "text", text: fs.readFileSync(componentsPath, "utf8") }] };
+    });
+    server.tool("mock_ui_get_design", "디자인 토큰 및 규칙(DESIGN.md)을 반환합니다. " +
+        "mock_ui_scaffold 호출 전에 이 도구 또는 mock-ui://design 리소스로 디자인 시스템 규칙을 파악하세요.", {}, async () => {
+        try {
+            return { content: [{ type: "text", text: await getDesignMd() }] };
+        }
+        catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return { content: [{ type: "text", text: msg }], isError: true };
+        }
+    });
     // ── Step 1: scaffold ─────────────────────────────────────────────────────
     server.tool("mock_ui_scaffold", "사용자가 'mock-ui', '목업', '화면 만들어줘', '시안' 키워드로 새 화면 생성을 요청하면 이 도구부터 호출합니다. " +
         "보일러플레이트를 클론하고 디자인 리소스를 복사해 mock 디렉토리를 초기화합니다. " +
-        "이 도구를 호출하기 전에 mock-ui://components 와 mock-ui://design 리소스를 읽어 " +
+        "이 도구를 호출하기 전에 mock_ui_get_components 와 mock_ui_get_design 을 먼저 호출해 " +
         "컴포넌트 카탈로그와 디자인 토큰을 파악하세요. {slug, archivePath}를 반환합니다.", scaffoldSchema, async (args) => {
         const { description } = args;
         try {

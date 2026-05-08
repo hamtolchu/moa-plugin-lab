@@ -12,7 +12,7 @@ const server = new mcp_js_1.McpServer({ name: "mock-ui", version: "1.0.0" }, {
         "트리거: 사용자가 'mock-ui', '목업', '화면 만들어줘', '시안', 'use mock-ui' 등의 표현으로 화면 생성을 요청하면 이 서버의 도구를 사용하세요.",
         "",
         "표준 워크플로 (반드시 순서 지킬 것):",
-        "1. mock-ui://components 와 mock-ui://design 리소스를 먼저 읽어 컴포넌트 카탈로그/디자인 토큰을 파악한다.",
+        "1. mock_ui_get_components 와 mock_ui_get_design 도구를 먼저 호출해 컴포넌트 카탈로그/디자인 토큰을 파악한다. (resources/read가 지원되는 환경에서는 mock-ui://components, mock-ui://design 리소스를 읽어도 됨)",
         "2. mock_ui_scaffold(description) 호출 → {slug, archivePath} 수령",
         "3. 리소스 규칙에 맞춰 app/page.tsx 전체 내용을 작성한다 (기존 컴포넌트 우선, 토큰만 사용, placeholder 금지).",
         "4. mock_ui_write_and_build(slug, pageTsx) 호출 → devUrl 수령",
