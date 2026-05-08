@@ -326,4 +326,4 @@ curl -fsSL https://raw.githubusercontent.com/hamtolchu/moa-plugin-lab/refs/heads
 
 ## 8. 문의처
 
-설치·사용 중 문제가 발생하면 슬랙 **#기획지원** 채널로 문의해 주세요.
+설치·사용 중 문제가 발생하면 DM 주세요.

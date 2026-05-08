@@ -74,7 +74,7 @@ echo "  (입력 내용은 화면에 표시되지 않습니다)"
 echo ""
 
 while true; do
-  read -r -s -p "Vercel 토큰을 붙여넣으세요: " VERCEL_TOKEN
+  read -r -s -p "Vercel 토큰을 붙여넣으세요: " VERCEL_TOKEN < /dev/tty
   echo ""
   if [ -z "$VERCEL_TOKEN" ]; then
     warn "토큰이 비어 있습니다. 다시 입력하세요."
