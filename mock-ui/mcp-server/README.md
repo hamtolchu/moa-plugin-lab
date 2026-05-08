@@ -98,7 +98,3 @@ Claude Desktop ←→ mock-ui MCP 서버 (stdio) ←→ scripts/ (Node.js)
 
 **재설치**
 → `curl -fsSL .../install.sh | bash` 를 다시 실행하면 업데이트됩니다.
-
----
-
-문의: `#기획지원` 슬랙 채널
