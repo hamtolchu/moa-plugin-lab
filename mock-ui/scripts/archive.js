@@ -8,7 +8,6 @@ const path = require('path');
 const os = require('os');
 
 const ARCHIVE_DIR = path.join(os.homedir(), '.mock-ui-archive');
-const [,, command, arg] = process.argv;
 
 function readMetadata(slug) {
   const metaPath = path.join(ARCHIVE_DIR, slug, '.mock-ui.json');
@@ -22,13 +21,9 @@ function readMetadata(slug) {
   }
 }
 
-if (command === 'list') {
-  if (!fs.existsSync(ARCHIVE_DIR)) {
-    process.stdout.write('[]\n');
-    process.exit(0);
-  }
-
-  const mocks = fs.readdirSync(ARCHIVE_DIR)
+function listMocks() {
+  if (!fs.existsSync(ARCHIVE_DIR)) return [];
+  return fs.readdirSync(ARCHIVE_DIR)
     .filter(name => {
       try { return fs.statSync(path.join(ARCHIVE_DIR, name)).isDirectory(); }
       catch { return false; }
@@ -36,24 +31,36 @@ if (command === 'list') {
     .sort()
     .reverse() // newest first (date-prefixed slugs)
     .map(readMetadata);
-
-  process.stdout.write(JSON.stringify(mocks, null, 2) + '\n');
-
-} else if (command === 'metadata') {
-  if (!arg) {
-    process.stderr.write('Usage: node archive.js metadata <slug>\n');
-    process.exit(1);
-  }
-
-  const mockDir = path.join(ARCHIVE_DIR, arg);
-  if (!fs.existsSync(mockDir)) {
-    process.stderr.write(`Mock '${arg}' not found in ${ARCHIVE_DIR}\n`);
-    process.exit(1);
-  }
-
-  process.stdout.write(JSON.stringify(readMetadata(arg), null, 2) + '\n');
-
-} else {
-  process.stderr.write('Usage: node archive.js list | metadata <slug>\n');
-  process.exit(1);
 }
+
+function getMockMetadata(slug) {
+  const mockDir = path.join(ARCHIVE_DIR, slug);
+  if (!fs.existsSync(mockDir)) {
+    throw new Error(`Mock '${slug}' not found in ${ARCHIVE_DIR}`);
+  }
+  return readMetadata(slug);
+}
+
+if (require.main === module) {
+  const [,, command, arg] = process.argv;
+
+  if (command === 'list') {
+    process.stdout.write(JSON.stringify(listMocks(), null, 2) + '\n');
+  } else if (command === 'metadata') {
+    if (!arg) {
+      process.stderr.write('Usage: node archive.js metadata <slug>\n');
+      process.exit(1);
+    }
+    try {
+      process.stdout.write(JSON.stringify(getMockMetadata(arg), null, 2) + '\n');
+    } catch (err) {
+      process.stderr.write(err.message + '\n');
+      process.exit(1);
+    }
+  } else {
+    process.stderr.write('Usage: node archive.js list | metadata <slug>\n');
+    process.exit(1);
+  }
+}
+
+module.exports = { listMocks, getMockMetadata };

@@ -11,33 +11,22 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const [,, command, archivePath] = process.argv;
+const EXPECTED_ROOT = path.join(os.homedir(), '.mock-ui-archive');
 
-if (!command || !archivePath) {
-  process.stderr.write('Usage: node dev-server.js start|stop|status <archive-path>\n');
-  process.exit(1);
+function validateArchivePath(archivePath) {
+  const abs = path.resolve(archivePath);
+  if (!abs.startsWith(EXPECTED_ROOT + path.sep) && abs !== EXPECTED_ROOT) {
+    throw new Error(`아카이브 경로가 허용 범위 밖입니다: ${abs}`);
+  }
+  if (!fs.existsSync(abs)) {
+    throw new Error(`아카이브 경로를 찾을 수 없습니다: ${abs}`);
+  }
+  return abs;
 }
 
-// Validate archive path is within the expected directory (same pattern as deploy.js)
-const absoluteArchive = path.resolve(archivePath);
-const expectedRoot = path.join(os.homedir(), '.mock-ui-archive');
-if (!absoluteArchive.startsWith(expectedRoot + path.sep) && absoluteArchive !== expectedRoot) {
-  process.stderr.write(`ERROR: 아카이브 경로가 허용 범위 밖입니다: ${absoluteArchive}\n`);
-  process.exit(1);
-}
-
-if (!fs.existsSync(absoluteArchive)) {
-  process.stderr.write(`ERROR: 아카이브 경로를 찾을 수 없습니다: ${absoluteArchive}\n`);
-  process.exit(1);
-}
-
-const PID_FILE = path.join(absoluteArchive, '.dev-server.pid');
-const URL_FILE = path.join(absoluteArchive, '.dev-server.url');
-const LOG_FILE = path.join(absoluteArchive, '.dev-server.log');
-
-function readPid() {
+function readPid(absPath) {
   try {
-    return parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
+    return parseInt(fs.readFileSync(path.join(absPath, '.dev-server.pid'), 'utf8').trim(), 10);
   } catch {
     return null;
   }
@@ -53,8 +42,10 @@ function isPidAlive(pid) {
   }
 }
 
-function stopServer() {
-  const pid = readPid();
+function stopDevServer(archivePath) {
+  // Best-effort: no throw — stopping a non-running server is always a no-op
+  const abs = path.resolve(archivePath);
+  const pid = readPid(abs);
   if (pid && isPidAlive(pid)) {
     try {
       // Negative PID kills the entire process group (pnpm + child Next.js process).
@@ -65,7 +56,10 @@ function stopServer() {
       process.stderr.write(`PID ${pid} 정지 실패: ${err.message}\n`);
     }
   }
-  for (const f of [PID_FILE, URL_FILE]) {
+  for (const f of [
+    path.join(abs, '.dev-server.pid'),
+    path.join(abs, '.dev-server.url'),
+  ]) {
     try { fs.unlinkSync(f); } catch {}
   }
 }
@@ -86,16 +80,16 @@ async function findFreePort(start = 3000, end = 3010) {
   return null;
 }
 
-function pollUntilReady(port, pid, timeoutMs = 30000) {
+function pollUntilReady(port, pid, logFile, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
     function attempt() {
       if (!isPidAlive(pid)) {
-        reject(new Error(`Dev 서버 프로세스(PID ${pid})가 즉시 종료되었습니다. 로그를 확인하세요: ${LOG_FILE}`));
+        reject(new Error(`Dev 서버 프로세스(PID ${pid})가 즉시 종료되었습니다. 로그를 확인하세요: ${logFile}`));
         return;
       }
       if (Date.now() > deadline) {
-        reject(new Error(`Dev 서버가 ${timeoutMs / 1000}초 내에 응답하지 않았습니다. 로그: ${LOG_FILE}`));
+        reject(new Error(`Dev 서버가 ${timeoutMs / 1000}초 내에 응답하지 않았습니다. 로그: ${logFile}`));
         return;
       }
       const req = http.get(`http://localhost:${port}/`, (res) => {
@@ -110,24 +104,26 @@ function pollUntilReady(port, pid, timeoutMs = 30000) {
   });
 }
 
-async function startServer() {
+async function startDevServer(archivePath) {
+  const absPath = validateArchivePath(archivePath);
+  const pidFile = path.join(absPath, '.dev-server.pid');
+  const urlFile = path.join(absPath, '.dev-server.url');
+  const logFile = path.join(absPath, '.dev-server.log');
+
   // Stop existing server if running (idempotent)
-  const existingPid = readPid();
+  const existingPid = readPid(absPath);
   if (existingPid && isPidAlive(existingPid)) {
     process.stderr.write(`기존 dev 서버 정지 중 (PID ${existingPid})...\n`);
-    stopServer();
+    stopDevServer(archivePath);
     await new Promise(r => setTimeout(r, 800));
   }
 
   const port = await findFreePort();
-  if (!port) {
-    process.stderr.write('ERROR: 사용 가능한 포트를 찾을 수 없습니다 (3000-3010 모두 사용 중).\n');
-    process.exit(1);
-  }
+  if (!port) throw new Error('사용 가능한 포트를 찾을 수 없습니다 (3000-3010 모두 사용 중).');
 
-  const logFd = fs.openSync(LOG_FILE, 'w');
+  const logFd = fs.openSync(logFile, 'w');
   const child = spawn('pnpm', ['dev', '--port', String(port)], {
-    cwd: absoluteArchive,
+    cwd: absPath,
     detached: true,
     stdio: ['ignore', logFd, logFd],
   });
@@ -135,41 +131,66 @@ async function startServer() {
   child.unref();
   fs.closeSync(logFd);
 
-  fs.writeFileSync(PID_FILE, String(child.pid));
+  fs.writeFileSync(pidFile, String(child.pid));
   const url = `http://localhost:${port}`;
-  fs.writeFileSync(URL_FILE, url);
+  fs.writeFileSync(urlFile, url);
 
   process.stderr.write(`Dev 서버 시작 중 (PID ${child.pid}, port ${port})...\n`);
-
   try {
-    await pollUntilReady(port, child.pid);
+    await pollUntilReady(port, child.pid, logFile);
     process.stderr.write('Dev 서버 준비 완료\n');
   } catch (err) {
     process.stderr.write(`WARNING: ${err.message}\n`);
     // Output the URL anyway — server may just be warming up
   }
 
-  process.stdout.write(url + '\n');
+  return url;
 }
 
-if (command === 'start') {
-  startServer().catch(err => {
-    process.stderr.write(`ERROR: ${err.message}\n`);
-    process.exit(1);
-  });
-} else if (command === 'stop') {
-  stopServer();
-} else if (command === 'status') {
-  const pid = readPid();
+function getDevServerStatus(archivePath) {
+  const abs = path.resolve(archivePath);
+  const pid = readPid(abs);
   const running = isPidAlive(pid);
   let url;
-  try { url = fs.readFileSync(URL_FILE, 'utf8').trim(); } catch {}
-  process.stdout.write(JSON.stringify({
-    running,
-    ...(pid && { pid }),
-    ...(url && { url }),
-  }, null, 2) + '\n');
-} else {
-  process.stderr.write(`알 수 없는 커맨드: ${command}\nUsage: node dev-server.js start|stop|status <archive-path>\n`);
-  process.exit(1);
+  try { url = fs.readFileSync(path.join(abs, '.dev-server.url'), 'utf8').trim(); } catch {}
+  return { running, ...(pid && { pid }), ...(url && { url }) };
 }
+
+if (require.main === module) {
+  const [,, command, archivePath] = process.argv;
+
+  if (!command || !archivePath) {
+    process.stderr.write('Usage: node dev-server.js start|stop|status <archive-path>\n');
+    process.exit(1);
+  }
+
+  if (command === 'start') {
+    startDevServer(archivePath)
+      .then(url => process.stdout.write(url + '\n'))
+      .catch(err => {
+        process.stderr.write(`ERROR: ${err.message}\n`);
+        process.exit(1);
+      });
+  } else if (command === 'stop') {
+    // CLI path-traversal guard (exported stopDevServer is best-effort, no guard needed for programmatic use)
+    const abs = path.resolve(archivePath);
+    if (!abs.startsWith(EXPECTED_ROOT + path.sep) && abs !== EXPECTED_ROOT) {
+      process.stderr.write(`ERROR: 아카이브 경로가 허용 범위 밖입니다: ${abs}\n`);
+      process.exit(1);
+    }
+    stopDevServer(archivePath);
+  } else if (command === 'status') {
+    try {
+      validateArchivePath(archivePath); // guard before reading status
+      process.stdout.write(JSON.stringify(getDevServerStatus(archivePath), null, 2) + '\n');
+    } catch (err) {
+      process.stderr.write(`ERROR: ${err.message}\n`);
+      process.exit(1);
+    }
+  } else {
+    process.stderr.write(`알 수 없는 커맨드: ${command}\nUsage: node dev-server.js start|stop|status <archive-path>\n`);
+    process.exit(1);
+  }
+}
+
+module.exports = { startDevServer, stopDevServer, getDevServerStatus };

@@ -1,6 +1,10 @@
 # mock-ui — Claude Code Plugin
 
-사내 디자인 규칙과 컴포넌트 키트를 기반으로 단일 화면 Mock UI를 생성하고 Vercel에 배포하는 Claude Code 플러그인입니다.
+사내 디자인 규칙과 컴포넌트 키트를 기반으로 단일 화면 Mock UI를 생성하고 Vercel에 배포합니다.
+
+> **Claude Desktop 사용자 (기획자):** Claude Code 없이도 사용 가능합니다.
+> `mcp-server/install.sh` 를 실행하면 Claude Desktop 에서 바로 동일한 기능을 사용할 수 있습니다.
+> 자세한 내용은 [`mcp-server/README.md`](mcp-server/README.md) 를 참고하세요.
 
 ---
 
