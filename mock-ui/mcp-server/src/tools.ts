@@ -27,6 +27,7 @@ export function registerTools(server: McpServer): void {
   // ── Step 1: scaffold ─────────────────────────────────────────────────────
   server.tool(
     "mock_ui_scaffold",
+    "사용자가 'mock-ui', '목업', '화면 만들어줘', '시안' 키워드로 새 화면 생성을 요청하면 이 도구부터 호출합니다. " +
     "보일러플레이트를 클론하고 디자인 리소스를 복사해 mock 디렉토리를 초기화합니다. " +
     "이 도구를 호출하기 전에 mock-ui://components 와 mock-ui://design 리소스를 읽어 " +
     "컴포넌트 카탈로그와 디자인 토큰을 파악하세요. {slug, archivePath}를 반환합니다.",
@@ -69,6 +70,7 @@ export function registerTools(server: McpServer): void {
   // ── Deploy (fresh) ───────────────────────────────────────────────────────
   server.tool(
     "mock_ui_deploy",
+    "사용자가 명시적으로 '배포', 'deploy', 'Vercel에 올려줘'를 요청한 경우에만 호출. dev 미리보기 단계에서는 절대 호출 금지. " +
     "로컬 mock을 Vercel에 프로덕션 배포하고 공개 URL을 반환합니다. VERCEL_TOKEN이 필요합니다. " +
     "{slug, prodUrl}를 반환합니다.",
     slugSchema,
@@ -87,6 +89,7 @@ export function registerTools(server: McpServer): void {
   // ── Redeploy (stop dev + deploy) ─────────────────────────────────────────
   server.tool(
     "mock_ui_redeploy",
+    "사용자가 명시적으로 '재배포', 'redeploy', '다시 배포'를 요청한 경우에만 호출. dev 미리보기 단계에서는 절대 호출 금지. " +
     "dev 서버를 정지하고 현재 상태를 Vercel에 재배포합니다. {slug, prodUrl}를 반환합니다.",
     slugSchema,
     async (args) => {
@@ -105,6 +108,7 @@ export function registerTools(server: McpServer): void {
   // ── Stop dev server ──────────────────────────────────────────────────────
   server.tool(
     "mock_ui_stop",
+    "'dev 서버 꺼줘', '정지', 'stop'을 요청하면 호출합니다. " +
     "로컬 dev 서버를 정지합니다. 이미 꺼져 있어도 오류 없이 완료됩니다. {slug, stopped: true}를 반환합니다.",
     slugSchema,
     async (args) => {
@@ -117,6 +121,7 @@ export function registerTools(server: McpServer): void {
   // ── List all mocks ───────────────────────────────────────────────────────
   server.tool(
     "mock_ui_list",
+    "'mock 목록', '지금까지 만든 화면', '내 mock-ui'를 물으면 호출합니다. " +
     "로컬에 저장된 모든 mock 목록을 최신순으로 반환합니다.",
     {},
     async () => {
@@ -128,6 +133,7 @@ export function registerTools(server: McpServer): void {
   // ── Status of one mock ───────────────────────────────────────────────────
   server.tool(
     "mock_ui_status",
+    "'상태', '실행 중이야?', 'dev 서버 살아있어?' 등을 물으면 호출합니다. " +
     "특정 mock의 dev 서버 실행 상태, 로컬 URL, 배포 URL을 반환합니다.",
     slugSchema,
     async (args) => {
